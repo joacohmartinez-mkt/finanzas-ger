@@ -399,6 +399,7 @@ async function submitForm() {
   const btn = document.getElementById("submit-btn");
   btn.disabled = true; btn.textContent = "Guardando...";
 
+  const [y, m] = fecha.split("-").map(Number);
   const params = { fecha, tipo, categoria, descripcion: desc, monto, metodo: document.getElementById("f-metodo").value, nota: document.getElementById("f-nota").value };
 
   try {
@@ -413,8 +414,6 @@ async function submitForm() {
     document.getElementById("f-desc").value = "";
     document.getElementById("f-monto").value = "";
     document.getElementById("f-nota").value = "";
-    // Sync month if different
-    const [y,m] = fecha.split("-").map(Number);
     currentDate = new Date(y, m-1, 1);
     updateMonthLabel();
     await loadMovimientos();
