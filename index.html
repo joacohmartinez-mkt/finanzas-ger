@@ -464,6 +464,7 @@ function setTab(n) {
   [0,1,2].forEach(i => {
     document.getElementById("bnav-" + i).className = "bnav-btn" + (i === n ? " active" : "");
   });
+  if (n === 0) loadMovimientos();
   if (n === 1) renderDashboard();
   if (n === 2) renderAhorros();
 }
@@ -476,7 +477,9 @@ function updateMonthLabel() { document.getElementById("month-label").textContent
 function changeMonth(dir) {
   currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + dir, 1);
   updateMonthLabel();
-  loadMovimientos();
+  if (activeTab === 0) loadMovimientos();
+  else if (activeTab === 1) renderDashboard();
+  // tab 2 (ahorros) no depende del mes
 }
 
 // ── API ──────────────────────────────────────────────────────
@@ -488,11 +491,7 @@ async function api(params) {
 }
 
 async function loadMovimientos() {
-  if (activeTab === 0) {
-    document.getElementById("mov-list").innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
-  } else if (activeTab === 1) {
-    document.getElementById("dash-content").innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
-  }
+  document.getElementById("mov-list").innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
   try {
     const data = await api({ action: "get", month: currentDate.getMonth()+1, year: currentDate.getFullYear() });
     movimientos = (data.data || []).map(r => ({
@@ -502,11 +501,9 @@ async function loadMovimientos() {
     })).sort((a,b) => b.fecha.localeCompare(a.fecha));
     saveCache(currentDate.getMonth()+1, currentDate.getFullYear(), movimientos);
     updateKPIs();
-    if (activeTab === 0) renderLista();
-    else if (activeTab === 1) renderDashboard();
+    renderLista();
   } catch(e) {
-    if (activeTab === 0) document.getElementById("mov-list").innerHTML = '<div class="empty">Error de conexión. Revisá la URL.</div>';
-    else if (activeTab === 1) document.getElementById("dash-content").innerHTML = '<div class="empty">Error de conexión.</div>';
+    document.getElementById("mov-list").innerHTML = '<div class="empty">Error de conexión. Revisá la URL.</div>';
   }
 }
 
@@ -688,8 +685,15 @@ async function fetchAndCacheMonth(m, y) {
 
 async function buildDashData() {
   const months = getMonthsForPeriod();
-  const missing = months.filter(({m,y}) => loadCache(m,y) === null);
-  if (missing.length) await Promise.all(missing.map(({m,y}) => fetchAndCacheMonth(m,y)));
+  const curM = currentDate.getMonth()+1, curY = currentDate.getFullYear();
+
+  // Siempre re-fetchea el mes actual (puede haber cambiado); usa caché para los demás
+  const toFetch = months.filter(({m,y}) => (m===curM && y===curY) || loadCache(m,y) === null);
+  if (toFetch.length) await Promise.all(toFetch.map(({m,y}) => fetchAndCacheMonth(m,y)));
+
+  // Sincronizar movimientos con el mes actual para que el KPI strip sea correcto
+  movimientos = loadCache(curM, curY) || [];
+  updateKPIs();
 
   let all = months.flatMap(({m,y}) => loadCache(m,y) || []);
 
