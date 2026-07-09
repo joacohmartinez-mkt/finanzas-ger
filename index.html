@@ -24,6 +24,25 @@
   }
   html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--ink); overflow-x: hidden; }
 
+  /* ── PIN LOCK ── */
+  #pin-screen {
+    position: fixed; inset: 0; background: var(--header); z-index: 200;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 32px 24px; text-align: center; gap: 16px;
+  }
+  #pin-screen .pin-emoji { font-size: 40px; }
+  #pin-screen h1 { font-family: 'Playfair Display', serif; color: #e8d5a0; font-size: 26px; }
+  #pin-screen p { color: #8a7558; font-size: 13px; line-height: 1.6; }
+  #pin-screen input {
+    width: 100%; max-width: 260px; padding: 14px 16px; border-radius: 12px; border: 1.5px solid #3a2e1a;
+    background: #261d0f; color: #e8d5a0; font-size: 18px; text-align: center; letter-spacing: 6px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  #pin-screen input::placeholder { color: #5a4a30; letter-spacing: normal; }
+  #pin-screen .setup-btn { max-width: 260px; }
+  #pin-error { color: #ff8a7a; font-size: 12.5px; font-weight: 600; min-height: 15px; display: none; }
+  #pin-error.on { display: block; }
+
   /* ── SETUP SCREEN ── */
   #setup-screen {
     position: fixed; inset: 0; background: var(--header); z-index: 100;
@@ -275,6 +294,17 @@
 </style>
 </head>
 <body>
+
+<!-- PIN LOCK -->
+<div id="pin-screen">
+  <div class="pin-emoji">🔒</div>
+  <h1>Mis Finanzas</h1>
+  <p>Ingresá el PIN para continuar.</p>
+  <input type="password" id="pin-input" inputmode="numeric" autocomplete="off" placeholder="PIN"
+         onkeydown="if(event.key==='Enter')checkPin()" />
+  <div id="pin-error">PIN incorrecto</div>
+  <button class="setup-btn" onclick="checkPin()">Entrar →</button>
+</div>
 
 <!-- SETUP SCREEN -->
 <div id="setup-screen" style="display:none">
@@ -1143,7 +1173,34 @@ function showToast(msg, bg = "#3a6b4a") {
   setTimeout(() => t.remove(), 2500);
 }
 
-init();
+// ── PIN LOCK ──────────────────────────────────────────────────
+const APP_PIN = "2025";
+const PIN_KEY = "finanzas_ger_unlocked";
+
+function unlock() {
+  document.getElementById("pin-screen").style.display = "none";
+  init();
+}
+function checkPin() {
+  const inp = document.getElementById("pin-input");
+  const err = document.getElementById("pin-error");
+  if ((inp.value || "").trim() === APP_PIN) {
+    localStorage.setItem(PIN_KEY, "1");
+    unlock();
+  } else {
+    err.classList.add("on");
+    inp.value = "";
+    inp.focus();
+  }
+}
+
+if (localStorage.getItem(PIN_KEY) === "1") {
+  document.getElementById("pin-screen").style.display = "none";
+  init();
+} else {
+  const _pi = document.getElementById("pin-input");
+  if (_pi) setTimeout(() => _pi.focus(), 80);
+}
 </script>
 </body>
 </html>
