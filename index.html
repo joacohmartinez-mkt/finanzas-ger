@@ -437,6 +437,7 @@ const CAT_COL = {
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 let API_URL = localStorage.getItem("finanzas_api_url") || "";
+let API_KEY = localStorage.getItem("finanzas_ger_key") || "";
 let tipo = "EGRESO";
 let categoria = "Materiales";
 let editId = null;
@@ -516,6 +517,7 @@ function changeMonth(dir) {
 async function api(params) {
   const url = new URL(API_URL);
   Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
+  url.searchParams.set("key", API_KEY);
   const res = await fetch(url.toString(), { redirect: "follow" });
   return res.json();
 }
@@ -524,6 +526,7 @@ async function loadMovimientos() {
   document.getElementById("mov-list").innerHTML = '<div class="loader"><div class="spinner"></div>Cargando...</div>';
   try {
     const data = await api({ action: "get", month: currentDate.getMonth()+1, year: currentDate.getFullYear() });
+    if (data && data.auth === false) { lockScreen(); return; }
     movimientos = (data.data || []).map(r => ({
       id: String(r.id), fecha: r.fecha, tipo: r.tipo,
       categoria: r.categoria, descripcion: r.descripcion,
@@ -1173,28 +1176,46 @@ function showToast(msg, bg = "#3a6b4a") {
   setTimeout(() => t.remove(), 2500);
 }
 
-// ── PIN LOCK ──────────────────────────────────────────────────
-const APP_PIN = "2025";
-const PIN_KEY = "finanzas_ger_unlocked";
-
-function unlock() {
-  document.getElementById("pin-screen").style.display = "none";
-  init();
+// ── PIN LOCK (validación server-side) ─────────────────────────
+// El PIN NO está en este código: se manda al Apps Script y el
+// server responde {auth:false} si es incorrecto. Sin PIN válido
+// los datos no cargan nunca.
+function lockScreen() {
+  API_KEY = "";
+  localStorage.removeItem("finanzas_ger_key");
+  const scr = document.getElementById("pin-screen");
+  if (scr) scr.style.display = "flex";
+  const inp = document.getElementById("pin-input");
+  if (inp) { inp.value = ""; setTimeout(() => inp.focus(), 80); }
 }
-function checkPin() {
+
+async function checkPin() {
   const inp = document.getElementById("pin-input");
   const err = document.getElementById("pin-error");
-  if ((inp.value || "").trim() === APP_PIN) {
-    localStorage.setItem(PIN_KEY, "1");
-    unlock();
-  } else {
+  const btn = document.querySelector("#pin-screen .setup-btn");
+  const pin = (inp.value || "").trim();
+  if (!pin) return;
+  if (!API_URL) { err.textContent = "Falta configurar la conexión"; err.classList.add("on"); return; }
+  btn.disabled = true; btn.textContent = "Entrando…"; err.classList.remove("on");
+  API_KEY = pin;
+  try {
+    const data = await api({ action: "get", month: currentDate.getMonth()+1, year: currentDate.getFullYear() });
+    if (!data || data.auth === false || data.status !== "ok") throw new Error("bad");
+    localStorage.setItem("finanzas_ger_key", pin);
+    document.getElementById("pin-screen").style.display = "none";
+    init();
+  } catch (e) {
+    API_KEY = "";
+    localStorage.removeItem("finanzas_ger_key");
+    err.textContent = "PIN incorrecto";
     err.classList.add("on");
-    inp.value = "";
-    inp.focus();
+    inp.value = ""; inp.focus();
+  } finally {
+    btn.disabled = false; btn.textContent = "Entrar →";
   }
 }
 
-if (localStorage.getItem(PIN_KEY) === "1") {
+if (API_KEY) {
   document.getElementById("pin-screen").style.display = "none";
   init();
 } else {
